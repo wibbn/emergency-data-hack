@@ -1,16 +1,13 @@
 from datetime import timedelta
 import pandas as pd
 import numpy as np
-
-pd.set_option('display.max_rows', None)
-pd.set_option('display.max_colwidth', None)
-pd.set_option('display.max_columns', None)
+from sklearn.preprocessing import OneHotEncoder
 
 def hour_rounder(t):
     return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
                + timedelta(hours=t.minute//30))
 
-def get_data(path, target=True, features=[]):
+def get_data(path, target=True, cats=[]):
 
     traffic = pd.read_csv('data/raw/traffic.csv', usecols=[0, 1, 2, 4, 5, 9, 10, 11], parse_dates=['datetime'])
     traffic['datetime'] = traffic['datetime'].map(lambda x: hour_rounder(x))
@@ -32,16 +29,19 @@ def get_data(path, target=True, features=[]):
     if target:
         condition1 = (data['target'].isnull()) & (data['data_id'].isnull())
         condition2 = ~(data['target'].isnull()) & (data['data_id'].isnull())
+        data = data.drop(data[condition1].index)
         data = data.drop(data[condition2].index)
     else:
         condition1 = (data['target'].isnull()) & (data['data_id'].isnull())
-    
-    data = data.drop(data[condition1].index)
+        data = data.drop(data[condition1].index)
 
     data['year'] = data['datetime'].map(lambda x: x.year)
     index_repair = data[data.set_index(['road_km','year', 'road_id']).index.isin(repair.set_index(['road_km', 'year', 'road_id']).index)].index
     data.loc[index_repair, 'repair'] = 1
     data = data.fillna(0)
+    data['repair'] = data['repair'].astype(int)
+
+    # data = dfc
 
     hours = data['datetime'].map(lambda x: x.hour)
 
@@ -49,9 +49,11 @@ def get_data(path, target=True, features=[]):
     data['month'] = data['datetime'].map(lambda x: x.month)
     data['weekday'] = data['datetime'].map(lambda x: x.weekday())
 
+    # dums = pd.get_dummies(data, columns=cats)
+    # data = data.drop(cats, axis=1)
+    # data = pd.concat([data, dums], axis=1)
+
     if target:
-        columns = features + ['datetime', 'road_km', 'target']
-        data = data[columns]
         data.reset_index(drop=True, inplace=True)
 
     return data
