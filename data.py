@@ -25,6 +25,7 @@ def get_data(path, target=True):
     repair['year'] = repair['datetime'].map(lambda x: x.year)
 
     road_ints = pd.read_csv('data/custom/road_intervals.csv')
+    road_5km_ints = pd.read_csv('data/custom/road_intervals_5km.csv')
 
     if target:
         df = pd.read_csv(path, usecols=[0, 1, 2, 9, 10], parse_dates=['datetime'])
@@ -54,6 +55,16 @@ def get_data(path, target=True):
 
     data['road_km_int'] = data['road_km'] // 20 * 20
     data = pd.merge(data, road_ints, how='left', on=['road_id', 'road_km_int'])
+
+    data['road_5km_int'] = data['road_km'] // 5 * 5
+
+    for i in range(10):
+        data[f'top{i+1}_interval'] = 0
+
+    for road_id in data['road_id'].unique():
+        for i in range(10):
+            interval = road_5km_ints[road_5km_ints['road_id'] == road_id]['road_5km_int'].iloc[i]
+            data.loc[(data['road_id'] == road_id) & (data['road_5km_int'] == interval), f'top{i+1}_interval'] = 1
 
     hours = data['datetime'].map(lambda x: x.hour)
 
