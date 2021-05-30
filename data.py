@@ -1,19 +1,30 @@
 from datetime import timedelta
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
 
 def hour_rounder(t):
     return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
                + timedelta(hours=t.minute//30))
 
-def get_data(path, target=True, cats=[]):
+def get_data(path, target=True):
+    traffic_cols = [
+        'datetime',
+        'road_id',
+        'road_km',
+        'data_id',
+        'lane_count',
+        'volume',
+        'occupancy',
+        'speed'
+    ]
 
-    traffic = pd.read_csv('data/raw/traffic.csv', usecols=[0, 1, 2, 4, 5, 9, 10, 11], parse_dates=['datetime'])
+    traffic = pd.read_csv('data/raw/traffic.csv', usecols=traffic_cols, parse_dates=['datetime'])
     traffic['datetime'] = traffic['datetime'].map(lambda x: hour_rounder(x))
     
     repair = pd.read_csv('data/raw/repair.csv', parse_dates=['datetime'])
     repair['year'] = repair['datetime'].map(lambda x: x.year)
+
+    road_ints = pd.read_csv('data/custom/road_intervals.csv')
 
     if target:
         df = pd.read_csv(path, usecols=[0, 1, 2, 9, 10], parse_dates=['datetime'])
@@ -41,7 +52,8 @@ def get_data(path, target=True, cats=[]):
     data = data.fillna(0)
     data['repair'] = data['repair'].astype(int)
 
-    # data = dfc
+    data['road_km_int'] = data['road_km'] // 20 * 20
+    data = pd.merge(data, road_ints, how='left', on=['road_id', 'road_km_int'])
 
     hours = data['datetime'].map(lambda x: x.hour)
 
@@ -49,9 +61,14 @@ def get_data(path, target=True, cats=[]):
     data['month'] = data['datetime'].map(lambda x: x.month)
     data['weekday'] = data['datetime'].map(lambda x: x.weekday())
 
-    # dums = pd.get_dummies(data, columns=cats)
-    # data = data.drop(cats, axis=1)
-    # data = pd.concat([data, dums], axis=1)
+
+    drop_cols = [
+        'data_id',
+        'year',
+        'road_km_int'
+    ]
+
+    data.drop(drop_cols, axis=1, inplace=True)
 
     if target:
         data.reset_index(drop=True, inplace=True)
