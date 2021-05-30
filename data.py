@@ -10,7 +10,7 @@ def hour_rounder(t):
     return (t.replace(second=0, microsecond=0, minute=0, hour=t.hour)
                + timedelta(hours=t.minute//30))
 
-def get_data(path, target = True):
+def get_data(path, target=True, features=[]):
 
     traffic = pd.read_csv('data/raw/traffic.csv', usecols=[0, 1, 2, 4, 5, 9, 10, 11], parse_dates=['datetime'])
     traffic['datetime'] = traffic['datetime'].map(lambda x: hour_rounder(x))
@@ -27,32 +27,31 @@ def get_data(path, target = True):
     else:
         dfc = pd.read_csv(path, parse_dates=['datetime'])
 
-    tmp = pd.merge(dfc, traffic, how='outer', on=['datetime', 'road_km', 'road_id'])
+    data = pd.merge(dfc, traffic, how='outer', on=['datetime', 'road_km', 'road_id'])
 
     if target:
-        condition1 = (tmp['target'].isnull()) & (tmp['data_id'].isnull())
-        condition2 = ~(tmp['target'].isnull()) & (tmp['data_id'].isnull())
-        tmp = tmp.drop(tmp[condition2].index)
+        condition1 = (data['target'].isnull()) & (data['data_id'].isnull())
+        condition2 = ~(data['target'].isnull()) & (data['data_id'].isnull())
+        data = data.drop(data[condition2].index)
     else:
-        condition1 = (tmp['target'].isnull()) & (tmp['data_id'].isnull())
+        condition1 = (data['target'].isnull()) & (data['data_id'].isnull())
     
-    tmp = tmp.drop(tmp[condition1].index)
+    data = data.drop(data[condition1].index)
 
-    tmp['year'] = tmp['datetime'].map(lambda x: x.year)
-    index_repair = tmp[tmp.set_index(['road_km','year', 'road_id']).index.isin(repair.set_index(['road_km', 'year', 'road_id']).index)].index
-    tmp.loc[index_repair, 'repair'] = 1
-    tmp = tmp.fillna(0)
+    data['year'] = data['datetime'].map(lambda x: x.year)
+    index_repair = data[data.set_index(['road_km','year', 'road_id']).index.isin(repair.set_index(['road_km', 'year', 'road_id']).index)].index
+    data.loc[index_repair, 'repair'] = 1
+    data = data.fillna(0)
 
-    columns = ['datetime',
-                'road_km',
-                'volume',
-                'occupancy',
-                'speed',
-                'repair',
-                'target']
+    hours = data['datetime'].map(lambda x: x.hour)
+
+    data['night'] = ((hours > 21) | (hours < 6)).astype(int)
+    data['month'] = data['datetime'].map(lambda x: x.month)
+    data['weekday'] = data['datetime'].map(lambda x: x.weekday())
 
     if target:
-        tmp = tmp[columns]
-        tmp.reset_index(drop=True, inplace=True)
+        columns = features + ['datetime', 'road_km', 'target']
+        data = data[columns]
+        data.reset_index(drop=True, inplace=True)
 
-    return tmp
+    return data
